@@ -35,7 +35,14 @@ const GridCanvas=L.Layer.extend({
  }
 });
 const gridLayer=new GridCanvas();
-function revealSelection(){if(innerWidth<=640)$('selection').scrollIntoView({block:'nearest'});}
+function setPanelVisible(visible){
+ $('controls-panel').hidden=!visible;
+ $('panel-toggle').setAttribute('aria-expanded',String(visible));
+ $('panel-toggle').textContent=visible?'Hide controls':'Show controls';
+}
+$('panel-toggle').onclick=()=>setPanelVisible($('controls-panel').hidden);
+window.addEventListener('resize',()=>{if(innerWidth>640)setPanelVisible(true);});
+function revealSelection(){if(innerWidth<=640){setPanelVisible(true);$('selection').scrollIntoView({block:'nearest'});}}
 function selectGrid(latlng){if($('level').value!=='grid'||!$('population').checked)return;const p=swissTransform.inverse([latlng.lng,latlng.lat]),bx=Math.floor(p[0]/100),by=Math.floor(p[1]/100);let r;
  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const candidates=gridIndex.get((bx+dx)+','+(by+dy))||[];for(const candidate of candidates){if(p[0]>=candidate[0]&&p[0]<candidate[0]+100&&p[1]>=candidate[1]&&p[1]<candidate[1]+100)r=candidate;}}
  if(selectedCell)map.removeLayer(selectedCell);if(!r){$('selection').innerHTML='<h2>No published occupied cell</h2><p>This location has no occupied cell in the published grid, or lies outside coverage.</p>';revealSelection();return;}

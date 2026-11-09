@@ -3,20 +3,29 @@ async (page) => {
  const results = [];
  await page.waitForFunction(() => typeof worldCells !== 'undefined' && worldCells && document.getElementById('status').textContent.includes('published occupied cells'));
  async function clickMapCentre() {
+  const toggle=page.locator('#panel-toggle');
+  if(await toggle.isVisible() && await toggle.getAttribute('aria-expanded')==='true') await toggle.click();
   const p = await page.evaluate(() => {const b = document.getElementById('map').getBoundingClientRect(); return {x:b.x+b.width/2,y:b.y+b.height/2};});
   await page.mouse.click(p.x,p.y);
  }
- for (const size of [{width:1200,height:762},{width:390,height:844},{width:320,height:568},{width:640,height:360}]) {
+ for (const size of [{width:1200,height:762},{width:1920,height:1080},{width:390,height:844},{width:320,height:568},{width:640,height:360}]) {
   await page.setViewportSize(size);
+  await page.waitForFunction(()=>map.getSize().x===innerWidth && map.getSize().y===innerHeight);
   await page.locator('#reset').click();
-  await page.waitForFunction(() => !map._animatingZoom);
+  await page.waitForFunction(() => map.getZoom()===map.getBoundsZoom(L.latLngBounds([[45.82,5.96],[47.81,10.49]]),false,L.point(innerWidth>640?330:40,40)) && !map._animatingZoom);
   const good = await page.evaluate(() => {
    const m = document.getElementById('map').getBoundingClientRect(),a = document.querySelector('aside').getBoundingClientRect();
    const points = [[45.82,5.96],[47.81,10.49]].map(ll => map.latLngToContainerPoint(ll));
-   return document.documentElement.scrollWidth <= innerWidth && points.every(p => p.x >= 0 && p.x <= m.width && p.y >= 0 && p.y <= m.height) && (innerWidth > 640 || a.top >= m.bottom - 1);
+   return m.x===0 && m.y===0 && m.width===innerWidth && m.height===innerHeight && map.getSize().x===innerWidth && map.getSize().y===innerHeight && Math.abs(gridLayer.canvas.width/devicePixelRatio-innerWidth)<1 && Math.abs(gridLayer.canvas.height/devicePixelRatio-innerHeight)<1 && document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight && getComputedStyle(document.querySelector('aside')).position==='absolute' && a.x>=0 && a.x<=20 && a.right<=innerWidth && a.bottom<=innerHeight && points.every(p => p.x >= 0 && p.x <= m.width && p.y >= 0 && p.y <= m.height);
   });
   if (!good) throw Error('Map fit/layout failed: '+JSON.stringify(size));
-  results.push({viewport:size,fit:true});
+  results.push({viewport:size,fit:true,fullViewport:true,leftFloating:true});
+  if(size.width<=640){
+   await page.locator('#panel-toggle').click();
+   if(await page.locator('#controls-panel').isVisible())throw Error('Panel did not hide');
+   await page.locator('#panel-toggle').click();
+   if(!await page.locator('#controls-panel').isVisible())throw Error('Panel did not return');
+  }
  }
  await page.setViewportSize({width:1200,height:762});
  await page.locator('#level').selectOption('grid');
@@ -99,6 +108,10 @@ async (page) => {
  await clickMapCentre();
  const revealed = await page.evaluate(() => {const s=document.getElementById('selection').getBoundingClientRect(),a=document.querySelector('aside').getBoundingClientRect();return s.top >= a.top-1 && s.bottom <= a.bottom+1;});
  if (!revealed) throw Error('Mobile selected values hidden');
- await page.setViewportSize({width:1200,height:762});await page.locator('#boundaries').selectOption('canton');await page.locator('#reset').click();
+ await page.locator('#panel-toggle').click();
+ await page.setViewportSize({width:1200,height:762});
+ await page.waitForFunction(()=>!document.getElementById('controls-panel').hidden);
+ if(await page.locator('#panel-toggle').isVisible())throw Error('Mobile toggle visible on desktop');
+ await page.locator('#boundaries').selectOption('canton');await page.locator('#reset').click();
  return {results,layerCombinations:combinations,bases:3,pointerDrag:true,keyboardPan:true,zoomButtons:true,centreInspector:true,mobileSelectionRevealed:true,tileStatus:statuses};
 }
